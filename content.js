@@ -3,6 +3,7 @@ const CONFIG = {
   targetClass: "fc-event",
   hrefPattern: /\/(\d+)$/, // Extract final number from href path
   storageKey: "completedTasks", // Key for chrome.storage
+  hideCompletedKey: "hideCompletedTasks", // Key for hide completed toggle state
   maxStorageItems: 10000, // Max items before cleanup
 };
 
@@ -27,6 +28,35 @@ async function getCompletedTasks() {
   } catch (error) {
     console.error("Error reading from storage:", error);
     return {};
+  }
+}
+
+/**
+ * Get hide completed toggle state from chrome.storage
+ * @returns {Promise<boolean>} - True if completed tasks should be hidden
+ */
+async function getHideCompletedState() {
+  try {
+    const result = await chrome.storage.local.get(CONFIG.hideCompletedKey);
+    return result[CONFIG.hideCompletedKey] || false;
+  } catch (error) {
+    console.error("Error reading hide completed state:", error);
+    return false;
+  }
+}
+
+/**
+ * Save hide completed toggle state to chrome.storage
+ * @param {boolean} hideCompleted - Whether to hide completed tasks
+ * @returns {Promise<boolean>} - True if successful
+ */
+async function setHideCompletedState(hideCompleted) {
+  try {
+    await chrome.storage.local.set({ [CONFIG.hideCompletedKey]: hideCompleted });
+    return true;
+  } catch (error) {
+    console.error("Error saving hide completed state:", error);
+    return false;
   }
 }
 
@@ -227,6 +257,12 @@ async function processElement(element) {
   // Store status in dataset for toggle functionality
   element.dataset.taskStatus = status;
 
+  // Apply hide state if completed tasks should be hidden
+  const hideCompleted = await getHideCompletedState();
+  if (hideCompleted && isCompleted) {
+    element.style.display = "none";
+  }
+
   // Inject checkbox button
   injectCheckboxButton(element, taskId, isCompleted);
 }
@@ -282,7 +318,7 @@ function setupObserver() {
 /**
  * Create and inject toggle slider for showing/hiding completed tasks
  */
-function injectCompletedTasksToggle() {
+async function injectCompletedTasksToggle() {
   // Find the header toolbar
   const toolbar = document.querySelector(".fc-header-toolbar");
   if (!toolbar) {
@@ -294,6 +330,9 @@ function injectCompletedTasksToggle() {
   if (document.querySelector(".extension-completed-toggle")) {
     return;
   }
+
+  // Get saved toggle state
+  const savedState = await getHideCompletedState();
 
   // Create toggle container
   const toggleContainer = document.createElement("div");
@@ -320,7 +359,7 @@ function injectCompletedTasksToggle() {
   // Create checkbox input (hidden)
   const checkbox = document.createElement("input");
   checkbox.type = "checkbox";
-  checkbox.checked = false; // Default to showing completed tasks (unchecked = not hiding)
+  checkbox.checked = savedState; // Restore saved state
   checkbox.style.opacity = "0";
   checkbox.style.width = "0";
   checkbox.style.height = "0";
@@ -332,7 +371,7 @@ function injectCompletedTasksToggle() {
   slider.style.left = "0";
   slider.style.right = "0";
   slider.style.bottom = "0";
-  slider.style.backgroundColor = "#ccc";
+  slider.style.backgroundColor = savedState ? "#4a90e2" : "#ccc";
   slider.style.borderRadius = "24px";
   slider.style.transition = "0.3s";
 
@@ -347,14 +386,18 @@ function injectCompletedTasksToggle() {
   knob.style.backgroundColor = "white";
   knob.style.borderRadius = "50%";
   knob.style.transition = "0.3s";
+  knob.style.transform = savedState ? "translateX(20px)" : "translateX(0)";
 
   slider.appendChild(knob);
   switchContainer.appendChild(checkbox);
   switchContainer.appendChild(slider);
 
   // Add change event listener
-  checkbox.addEventListener("change", () => {
+  checkbox.addEventListener("change", async () => {
     const hideCompleted = checkbox.checked;
+
+    // Save state to storage
+    await setHideCompletedState(hideCompleted);
 
     // Update slider appearance
     if (hideCompleted) {
@@ -376,9 +419,6 @@ function injectCompletedTasksToggle() {
 
     console.log(`Completed tasks ${hideCompleted ? "hidden" : "shown"}`);
   });
-
-  // Set initial knob position (off/unchecked)
-  knob.style.transform = "translateX(0)";
 
   // Assemble toggle
   toggleContainer.appendChild(label);
