@@ -4,9 +4,9 @@
   "version": "1.0.0",
   "description": "Enhances mb calendar with task completion tracking",
 
-  "permissions": ["activeTab", "storage"],
+  "permissions": ["storage"],
 
-  "host_permissions": ["https://*.managebac.com/*"],
+  "host_permissions": ["https://*.managebac.com/calendar*"],
 
   "icons": {
     "16": "icons/icon-16.png",
@@ -17,7 +17,7 @@
 
   "content_scripts": [
     {
-      "matches": ["https://*.managebac.com/*"],
+      "matches": ["https://*.managebac.com/calendar*"],
       "js": ["content.js"],
       "css": ["styles.css"],
       "run_at": "document_idle"
